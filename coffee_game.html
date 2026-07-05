@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>マイ・コーヒー・ロースタリー＆カフェ</title>
+    <style>
+        body { 
+            font-family: 'Helvetica Neue', Arial, sans-serif; 
+            background: #231912; 
+            color: #f5ebe0; 
+            text-align: center; 
+            padding: 0; 
+            margin: 0; 
+            padding-bottom: 80px; 
+            user-select: none; 
+            -webkit-user-select: none;
+            touch-action: manipulation; 
+        }
+        h1 { color: #d4a373; margin: 20px 0 5px 0; font-size: 26px; }
+        .subtitle { color: #cca47e; font-size: 13px; margin-bottom: 20px; }
+        
+        /* メインレイアウト */
+        .game-layout { display: flex; flex-direction: column; align-items: center; gap: 15px; max-width: 600px; margin: 0 auto; padding: 0 15px; }
+        
+        /* 共通ステータス画面 */
+        .dashboard { width: 100%; background: #35251c; padding: 15px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 1px solid #4a3529; box-sizing: border-box; }
+        .resources { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+        .res-box { background: #231912; padding: 8px; border-radius: 6px; border-left: 3px solid #d4a373; text-align: left; }
+        .res-box div:first-child { font-size: 11px; color: #a68a75; }
+        .res-num { font-size: 16px; font-weight: bold; color: #fff; }
+        .coin-num { color: #ffd166 !important; }
+
+        /* 画面（ページ）の切り替え管理 */
+        .page { display: none; width: 100%; }
+        .page.active { display: block; }
+
+        /* コンテナ共通 */
+        .mill-container, .drip-container, .cafe-container, .shop-container { background: #35251c; padding: 25px 20px; border-radius: 12px; border: 1px solid #4a3529; display: flex; flex-direction: column; align-items: center; margin-top: 10px; width: 100%; box-sizing: border-box; }
+
+        /* --- ミッションボードUI --- */
+        .mission-board { width: 100%; background: #2b1e16; border: 2px solid #d4a373; border-radius: 12px; padding: 15px; box-sizing: border-box; text-align: left; margin-bottom: 5px; }
+        .mission-title { font-size: 15px; font-weight: bold; color: #ffd166; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .mission-list { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #e6ccb2; }
+        .mission-item { display: flex; justify-content: space-between; background: #35251c; padding: 6px 10px; border-radius: 6px; border: 1px solid #4a3529; }
+        .mission-item.done { border-color: #2a9d8f; color: #a8dadc; }
+        .mission-btn { width: 100%; margin-top: 10px; background: #e76f51; color: white; padding: 8px; font-size: 13px; }
+        .mission-btn:hover:not(:disabled) { background: #f4a261; }
+        .mission-btn:disabled { background: #4a3b32; color: #726055; }
+
+        /* --- キッチン画面用（レベルアップUI） --- */
+        .loop-chain { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+        .step-card { background: #35251c; padding: 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #4a3529; text-align: left; }
+        .step-info { flex: 1; padding-right: 10px; }
+        .step-title { font-size: 15px; font-weight: bold; color: #e6ccb2; display: flex; align-items: center; gap: 8px; }
+        .lvl-badge { font-size: 11px; background: #d4a373; color: #231912; padding: 1px 6px; border-radius: 4px; font-weight: bold; }
+        .lvl-badge.max { background: #2a9d8f; color: #fff; }
+        .step-desc { font-size: 11px; color: #b79a83; margin-top: 3px; }
+        .lvl-btn { font-size: 11px; padding: 6px 10px; background: #e9c46a; color: #231912; min-width: 105px; font-weight: bold; }
+        .lvl-btn:hover:not(:disabled) { background: #f4a261; }
+
+        /* --- ミル挽き画面用 --- */
+        .mill-wheel { width: 150px; height: 150px; border-radius: 50%; background: #4a3529; border: 8px solid #895737; position: relative; cursor: grab; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 15px rgba(0,0,0,0.5); touch-action: none; }
+        .mill-wheel:active { cursor: grabbing; }
+        .mill-handle { width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 4px solid #d4a373; position: absolute; top: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .mill-center { width: 20px; height: 20px; background: #231912; border-radius: 50%; }
+
+        /* --- ミル挽き 粉が散るエフェクト --- */
+        .mill-wheel-wrap { position: relative; width: 150px; height: 150px; }
+        .mill-particles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+        .grind-particle { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; border-radius: 50%; background: #a9825a; opacity: 1; animation: particleFly 0.6s ease-out forwards; }
+        @keyframes particleFly {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; }
+        }
+        
+        /* 共通プログレスバー */
+        .progress-bar-container { width: 80%; background: #231912; height: 15px; border-radius: 10px; margin-top: 15px; overflow: hidden; border: 1px solid #4a3529; }
+        .progress-bar { width: 0%; height: 100%; background: #d4a373; transition: width 0.1s; }
+        .drip-bar { background: #6f4e37; transition: width 0.2s linear; }
+
+        /* 名店メーター専用バー */
+        .fame-bar { background: linear-gradient(90deg, #ffb3c1, #ff4d6d); transition: width 0.3s ease; }
+
+        /* --- ドリップ画面用 --- */
+        .drip-visual { font-size: 50px; height: 80px; display: flex; justify-content: center; align-items: center; margin-bottom: 10px; }
+        .coffee-cup-btn { cursor: pointer; animation: float 1.2s infinite alternate; touch-action: none; }
+        @keyframes float { from { transform: translateY(0px); } to { transform: translateY(-8px); } }
+        .ready-text { font-size: 13px; color: #e63946; font-weight: bold; margin-top: 4px; animation: pulse 0.8s infinite alternate; }
+
+        /* --- カフェ（接客）画面用 --- */
+        .customer-area { min-height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; margin-bottom: 15px; width: 100%; }
+        .customer-bubble { background: #fff; color: #231912; padding: 10px 15px; border-radius: 15px; font-size: 13px; font-weight: bold; max-width: 80%; position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .customer-bubble::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); border-width: 8px 8px 0; border-style: solid; border-color: #fff transparent; display: block; width: 0; }
+        .customer-avatar { font-size: 55px; cursor: pointer; touch-action: none; transition: transform 0.1s; }
+        .customer-avatar:active { transform: scale(0.95); }
+        .serve-badge { background: #ffd166; color: #231912; font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: bold; margin-top: 5px; animation: pulse 0.6s infinite alternate; }
+        
+        /* 太客用のバッジ装飾 */
+        .serve-badge.vip { background: #ff4d6d; color: #fff; animation: pulse 0.3s infinite alternate; font-size: 12px; border: 1px solid #fff; }
+
+        /* 名店メーターUI */
+        .fame-container { width: 90%; background: #2a1f18; padding: 10px; border-radius: 8px; border: 1px solid #5a4335; margin: 15px 0; box-sizing: border-box; }
+        .fame-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #ffb3c1; }
+
+        @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
+        
+        /* --- 農場画面用 --- */
+        .farm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 100%; margin-top: 10px; }
+        .tree-card { background: #35251c; border: 1px solid #4a3529; border-radius: 10px; padding: 20px 10px; cursor: pointer; position: relative; transition: 0.2s; min-height: 90px; display: flex; flex-direction: column; justify-content: center; align-items: center; touch-action: none; }
+        .tree-card:hover:not(.locked) { background: #433025; }
+        
+        .tree-card.locked { background: #2a1f18; border: 1px dashed #443226; cursor: not-allowed; opacity: 0.5; }
+
+        .tree-icon { font-size: 32px; margin-bottom: 5px; }
+        .tree-status { font-size: 11px; color: #cca47e; }
+        .ready-badge { position: absolute; top: 5px; right: 5px; background: #e63946; color: white; font-size: 9px; padding: 2px 5px; border-radius: 10px; font-weight: bold; display: none; }
+        .tree-card.ready .ready-badge { display: block; animation: pulse 1s infinite alternate; }
+
+        /* --- ショップ画面用 --- */
+        .shop-badge { font-size: 40px; margin-bottom: 10px; }
+        .shop-title { font-size: 18px; color: #ffd166; font-weight: bold; margin-bottom: 6px; }
+        .shop-desc { font-size: 13px; color: #cca47e; line-height: 1.6; }
+
+        /* ボタン・バッジ */
+        .actions { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        button { font-size: 13px; padding: 8px 14px; cursor: pointer; background: #895737; color: white; border: none; border-radius: 6px; font-weight: bold; touch-action: manipulation; }
+        button:hover:not(:disabled) { background: #a66c46; }
+        button:disabled { background: #4a3b32; color: #726055; cursor: not-allowed; }
+
+        /* 下部ナビゲーションバー */
+        .navbar { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: #16100b; display: flex; border-top: 2px solid #4a3529; z-index: 100; }
+        .nav-item { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #a68a75; cursor: pointer; font-size: 10px; font-weight: bold; border: none; background: none; touch-action: manipulation; }
+        .nav-item:hover { background: #1f1610; }
+        .nav-item.active { color: #d4a373; background: #231912; }
+        .nav-icon { font-size: 18px; margin-bottom: 2px; }
+
+        /* 通知ドット（ミッション達成・収穫可能の点滅） */
+        .nav-dot { display: none; position: absolute; top: 6px; right: 26%; width: 11px; height: 11px; background: #ff4d4d; border-radius: 50%; box-shadow: 0 0 6px #ff4d4d; animation: dotPulse 0.8s infinite alternate; }
+        .nav-dot.show { display: block; }
+        @keyframes dotPulse { from { opacity: 0.4; transform: scale(0.8); } to { opacity: 1; transform: scale(1.25); } }
+
+        /* 管理系ボタン */
+        .system-btn { background: #4e1d1d; font-size: 10px; padding: 3px 8px; border-radius: 4px; color: #ffb3b3; margin-top: 5px; cursor: pointer; float: right; }
+        .system-btn:hover { background: #6e2a2a; }
+        .clear-float { clear: both; }
+
+        /* --- 🐱 猫イベント用UI --- */
+        .cat-swipe-hint { display: none; width: 100%; box-sizing: border-box; background: #2b1e16; border: 2px dashed #a8dadc; border-radius: 12px; padding: 14px; margin-bottom: 10px; font-size: 13px; color: #a8dadc; font-weight: bold; animation: swipeHintPulse 1.2s infinite alternate; }
+        @keyframes swipeHintPulse { from { opacity: 0.6; } to { opacity: 1; } }
+        .cat-card { display: none; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; background: #2b1e16; border: 2px solid #a8dadc; border-radius: 12px; padding: 15px; margin-bottom: 10px; }
+        .cat-card .cat-emoji { font-size: 40px; }
+        .cat-card .cat-title { font-size: 14px; color: #a8dadc; font-weight: bold; margin: 5px 0; }
+        .cat-card .cat-desc { font-size: 12px; color: #cca47e; }
+        .fever-banner { display: none; margin-top: 10px; font-size: 13px; color: #ffd166; font-weight: bold; animation: pulse 0.5s infinite alternate; }
+
+        /* --- ドリップ複数スロットUI --- */
+        .drip-slot-card { background: #35251c; padding: 15px; border-radius: 10px; border: 1px solid #4a3529; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
+        .drip-slot-title { font-size: 13px; font-weight: bold; color: #e6ccb2; margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+
+    <h1>☕ MY COFFEE ROASTERY</h1>
+    <div class="subtitle">〜本格派・超長期経営カフェシミュレーター〜</div>
+
+    <div class="game-layout">
+        <div class="dashboard">
+            <span class="system-btn" onclick="resetGame()">データを初期化</span>
+            <strong style="float: left; margin-top: 3px;">【現在のストック＆資産】</strong>
+            <div class="clear-float"></div>
+            <div class="resources">
+                <div class="res-box"><div>① 生豆の在庫</div><span class="res-num" id="raw-beans">5</span> 粒</div>
+                <div class="res-box"><div>② 挽いた粉</div><span class="res-num" id="ground-coffee">0</span> g</div>
+                <div class="res-box"><div>③ 淹れたコーヒー</div><span class="res-num" id="brewed-coffee">0</span> 杯</div>
+                <div class="res-box" style="border-left-color: #ffd166;"><div>④ カフェの売上</div><span class="res-num coin-num" id="player-coins">0</span> コイン</div>
+            </div>
+        </div>
+
+        <div id="page-kitchen" class="page active">
+            <div class="mission-board">
+                <div class="mission-title">
+                    <span id="m-board-title">📋 ティア1 ミッション</span>
+                    <span style="font-size:11px; color:#a68a75;" id="m-board-reward">報酬: 生豆+10粒</span>
+                </div>
+                <div class="mission-list">
+                    <div class="mission-item" id="m-item-1">
+                        <span id="m-text-1">1-1 コーヒー豆を3個収穫する</span>
+                        <strong id="m-count-1">0 / 3</strong>
+                    </div>
+                    <div class="mission-item" id="m-item-2">
+                        <span id="m-text-2">1-2 ミル挽きをし30gの粉を生成する</span>
+                        <strong id="m-count-2">0 / 30g</strong>
+                    </div>
+                    <div class="mission-item" id="m-item-3">
+                        <span id="m-text-3">1-3 ドリップをし3杯コーヒーを生成する</span>
+                        <strong id="m-count-3">0 / 3杯</strong>
+                    </div>
+                    <div class="mission-item" id="m-item-4">
+                        <span id="m-text-4">1-4 3杯のコーヒーをお客様に提供する</span>
+                        <strong id="m-count-4">0 / 3杯</strong>
+                    </div>
+                </div>
+                <button class="mission-btn" id="btn-claim-mission" onclick="claimMissionReward()" disabled>報酬を受け取る</button>
+            </div>
+
+            <div class="loop-chain">
+                <div class="step-card">
+                    <div class="step-info">
+                        <div class="step-title">🌳 コーヒー農場 <span class="lvl-badge" id="lbl-lvl-farm">Lv.1</span></div>
+                        <div class="step-desc" id="desc-farm">栽培マス増加 (現在: 1マス開放)</div>
+                    </div>
+                    <div class="actions">
+                        <button class="lvl-btn" id="btn-lvl-farm" onclick="buyLevel('farm')">強化: 1200C</button>
+                    </div>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-info">
+                        <div class="step-title">🔄 ミル挽き <span class="lvl-badge" id="lbl-lvl-mill">Lv.1</span></div>
+                        <div class="step-desc" id="desc-mill">手回し効率アップ</div>
+                    </div>
+                    <div class="actions">
+                        <button class="lvl-btn" id="btn-lvl-mill" onclick="buyLevel('mill')">強化: 800C</button>
+                    </div>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-info">
+                        <div class="step-title">🏪 カフェ接客 <span class="lvl-badge" id="lbl-lvl-cafe">Lv.1</span></div>
+                        <div class="step-desc" id="desc-cafe">単価＆来店率アップ</div>
+                    </div>
+                    <div class="actions">
+                        <button class="lvl-btn" id="btn-lvl-cafe" onclick="buyLevel('cafe')">強化: 400C</button>
+                    </div>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-info">
+                        <div class="step-title">💧 ドリップ抽出 <span class="lvl-badge" id="lbl-lvl-drip">Lv.1</span></div>
+                        <div class="step-desc" id="desc-drip">抽出スピードアップ</div>
+                    </div>
+                    <div class="actions">
+                        <button class="lvl-btn" id="btn-lvl-drip" onclick="buyLevel('drip')">強化: 200C</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-mill" class="page">
+            <div class="mill-container">
+                <p id="mill-instruction" style="font-size: 14px; color: #cca47e; margin: 0 0 15px 0;">生豆をセットしてハンドルをぐるぐる回そう！</p>
+                <div class="mill-wheel-wrap">
+                    <div class="mill-wheel" id="mill-wheel">
+                        <div class="mill-center"></div>
+                        <div class="mill-handle" id="mill-handle"></div>
+                    </div>
+                    <div class="mill-particles" id="mill-particles"></div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="mill-progress"></div>
+                </div>
+                <div style="font-size: 12px; margin-top: 8px; color: #a68a75;">
+                    挽き完了度: <span id="progress-text">0</span>% (生豆1粒消費 / 粉10g獲得)
+                </div>
+            </div>
+        </div>
+
+        <div id="page-cafe" class="page">
+            <div class="cafe-container">
+                <p id="cafe-instruction" style="font-size: 14px; color: #cca47e; margin: 0 0 15px 0;">来店したお客様をタップして、淹れたてのコーヒーを提供しよう！</p>
+                
+                <div class="customer-area" id="customer-area">
+                    <div class="customer-bubble" id="cust-bubble">次のお客様を待っています...</div>
+                    <div class="customer-avatar" id="cust-avatar" onclick="serveCustomer()">🛋️</div>
+                    <div id="serve-badge-area"></div>
+                </div>
+
+                <div class="fame-container">
+                    <div class="fame-header">
+                        <span>🏅 名店メーター</span>
+                        <span id="lbl-fame-level">Lv.1</span>
+                    </div>
+                    <div class="progress-bar-container" style="width: 100%; height: 12px; margin-top: 6px;">
+                        <div class="progress-bar fame-bar" id="fame-progress"></div>
+                    </div>
+                    <div style="font-size: 11px; display: flex; justify-content: space-between; margin-top: 4px;">
+                        <span style="color: #ffb3c1; font-weight: bold;" id="lbl-fame-vip-chance">太客確率: 0%</span>
+                        <span style="color: #ffb3c1;" id="lbl-fame-count">次のレベルまで: 0 / 10 杯</span>
+                    </div>
+                </div>
+
+                <div style="font-size: 12px; color: #a68a75;">
+                    通常: <span style="color: #ffd166; font-weight: bold;" id="txt-earnings-per-cup">+100C</span> | 
+                    <span style="color: #ff4d6d; font-weight: bold;">👑 太客(Lv.2〜): +1,000C!</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-drip" class="page">
+            <div class="drip-container">
+                <p id="drip-instruction" style="font-size: 14px; color: #cca47e; margin: 0 0 15px 0;">挽いた粉(10g)を使って美味しいコーヒーを抽出しよう！</p>
+                <div id="drip-slots-container" style="width:100%; display:flex; flex-direction:column; gap:12px;"></div>
+            </div>
+        </div>
+
+        <div id="page-farm" class="page">
+            <p id="farm-instruction" style="font-size: 13px; color: #cca47e; margin: 5px 0;">じっくり1分（60秒）かけて豆が実ります。タップして手動収穫！</p>
+
+            <div class="cat-swipe-hint" id="cat-swipe-hint">🐱 画面を横に「スワイプ」してみよう…！何かが起こるかも？</div>
+
+            <div class="cat-card" id="cat-card">
+                <div class="cat-emoji">🐱</div>
+                <div class="cat-title">農場の猫にコーヒー豆をあげよう！</div>
+                <div class="cat-desc" id="cat-feed-desc">必要な生豆: 100粒</div>
+                <button id="btn-feed-cat" onclick="feedCat()" style="margin-top:8px;">豆をあげる (100粒)</button>
+                <div class="fever-banner" id="fever-banner">🔥 フィーバータイム！ 残り<span id="fever-timer">0</span>秒 豆取り放題！木をどんどんタップしよう！</div>
+            </div>
+
+            <div class="farm-grid">
+                <div class="tree-card" onclick="harvestTree(0)" id="tree-0"><span class="ready-badge">収穫可能!</span><div class="tree-icon" id="icon-0">🌱</div><div class="tree-status" id="status-0">成長中</div></div>
+                <div class="tree-card" onclick="harvestTree(1)" id="tree-1"><span class="ready-badge">収穫可能!</span><div class="tree-icon" id="icon-1">🌱</div><div class="tree-status" id="status-1">成長中</div></div>
+                <div class="tree-card" onclick="harvestTree(2)" id="tree-2"><span class="ready-badge">収穫可能!</span><div class="tree-icon" id="icon-2">🌱</div><div class="tree-status" id="status-2">成長中</div></div>
+                <div class="tree-card" onclick="harvestTree(3)" id="tree-3"><span class="ready-badge">収穫可能!</span><div class="tree-icon" id="icon-3">🌱</div><div class="tree-status" id="status-3">成長中</div></div>
+                <div class="tree-card" onclick="harvestTree(4)" id="tree-4"><span class="ready-badge">収穫可能!</span><div class="tree-icon" id="icon-4">🌱</div><div class="tree-status" id="status-4">成長中</div></div>
+                <div class="tree-card" onclick="harvestTree(5)" id="tree-5"><span class="ready-badge">収穫可能!</span><div class="tree-icon" id="icon-5">🌱</div><div class="tree-status" id="status-5">成長中</div></div>
+            </div>
+        </div>
+
+        <div id="page-shop" class="page">
+            <div class="shop-container">
+                <div class="shop-badge">🎁</div>
+                <div class="shop-title">ショップ</div>
+                <div class="shop-desc" style="margin-bottom:15px;">コインでお店の設備をアップグレード！「⭐」の付いたアイテムは何度でも購入でき、購入するたびに効果アップ＆値上がりします。</div>
+
+                <div class="loop-chain" style="width:100%;">
+                    <div class="step-card">
+                        <div class="step-info">
+                            <div class="step-title">💊 栄養剤 <span class="lvl-badge" id="lbl-shop-nutrient">未所持</span></div>
+                            <div class="step-desc">豆の収穫タイムが3秒早くなる（全ての木に永続効果）</div>
+                        </div>
+                        <div class="actions">
+                            <button class="lvl-btn" id="btn-shop-nutrient" onclick="buyShopItem('nutrient')">購入: 800C</button>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-info">
+                            <div class="step-title">🔧 中古のミル挽き <span class="lvl-badge" id="lbl-shop-usedMill">未所持</span></div>
+                            <div class="step-desc">半回転でミルが挽けるようになる（耐久100回で壊れる。壊れたら再購入可能）</div>
+                        </div>
+                        <div class="actions">
+                            <button class="lvl-btn" id="btn-shop-usedMill" onclick="buyShopItem('usedMill')">購入: 3000C</button>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-info">
+                            <div class="step-title">☕ 中古のドリッパー <span class="lvl-badge" id="lbl-shop-usedDripper">未所持</span></div>
+                            <div class="step-desc">2台体制でドリップでき、最低でも2秒で完了（耐久75回で壊れる。壊れたら再購入可能）</div>
+                        </div>
+                        <div class="actions">
+                            <button class="lvl-btn" id="btn-shop-usedDripper" onclick="buyShopItem('usedDripper')">購入: 2500C</button>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-info">
+                            <div class="step-title">💰 コインブースト ⭐ <span class="lvl-badge" id="lbl-shop-coinBoost">Lv.0</span></div>
+                            <div class="step-desc">購入するたびに全てのコイン収益が+5%（何度でも購入可・購入毎に値上がり）</div>
+                        </div>
+                        <div class="actions">
+                            <button class="lvl-btn" id="btn-shop-coinBoost" onclick="buyCoinBoost()">購入: 5000C</button>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-info">
+                            <div class="step-title">📢 看板アップグレード ⭐ <span class="lvl-badge" id="lbl-shop-sign">Lv.0</span></div>
+                            <div class="step-desc">購入するたびに来店率が+3%（何度でも購入可・購入毎に値上がり）</div>
+                        </div>
+                        <div class="actions">
+                            <button class="lvl-btn" id="btn-shop-sign" onclick="buySignUpgrade()">購入: 4000C</button>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-info">
+                            <div class="step-title">🧑‍🍳 アルバイトスタッフ <span class="lvl-badge" id="lbl-shop-staff">未雇用</span></div>
+                            <div class="step-desc">収穫・ドリップ受け取り・接客を自動化（猫の勧誘は対象外）。30秒毎に200Cの給料が発生</div>
+                        </div>
+                        <div class="actions">
+                            <button class="lvl-btn" id="btn-shop-staff" onclick="buyStaff()">雇用: 10000C</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="navbar">
+        <button class="nav-item active" id="nav-kitchen" onclick="switchPage('kitchen')">
+            <span class="nav-dot" id="dot-kitchen"></span>
+            <span class="nav-icon">☕</span>
+            <span>キッチン</span>
+        </button>
+        <button class="nav-item" id="nav-mill" onclick="switchPage('mill')">
+            <span class="nav-icon">🔄</span>
+            <span>ミル挽き</span>
+        </button>
+        <button class="nav-item" id="nav-cafe" onclick="switchPage('cafe')" style="background: rgba(212,163,115,0.1);">
+            <span class="nav-icon">🏪</span>
+            <span style="color: #ffd166;">カフェ</span>
+        </button>
+        <button class="nav-item" id="nav-drip" onclick="switchPage('drip')">
+            <span class="nav-icon">💧</span>
+            <span>ドリップ</span>
+        </button>
+        <button class="nav-item" id="nav-farm" onclick="switchPage('farm')">
+            <span class="nav-dot" id="dot-farm"></span>
+            <span class="nav-icon">🌳</span>
+            <span>農場</span>
+        </button>
+        <button class="nav-item" id="nav-shop" onclick="switchPage('shop')" style="display:none;">
+            <span class="nav-icon">🎁</span>
+            <span>ショップ</span>
+        </button>
+    </div>
+
+    <script>
+        // --- ゲームデータ＆レベル初期値 ---
+        let rawBeans = 5;       
+        let groundCoffee = 0;   
+        let brewedCoffee = 0;   
+        let playerCoins = 0;    
+
+        let levels = { farm: 1, mill: 1, drip: 1, cafe: 1 };
+        
+        let fameLevel = 1;
+        let fameCoffeeCount = 0; 
+        
+        let isLockSave = false; 
+
+        // --- ミッションデータ（拡張） ---
+        let currentTier = 1; // 現在のティア (1, 2, 3。全クリア後は 4)
+        let missionProgress = { harvest: 0, grind: 0, drip: 0, serve: 0, t2Drip: 0, t3Drip: 0, t3VipServed: false, endlessDrip: 0, endlessVipServed: 0 };
+        let missionClaimed = false; // 各現在のティアの報酬を受け取ったか
+        let shopUnlocked = false; // ショップ解放フラグ
+
+        // --- 🎁 ショップ購入品（買い切り・永続効果／耐久あり） ---
+        let ownedItems = { nutrient: false, usedMill: false, usedDripper: false };
+        const shopCosts = { nutrient: 800, usedMill: 3000, usedDripper: 2500 };
+        let usedMillUses = 0;      // 中古ミルの残り耐久（購入時100スタート）
+        let usedDripperUses = 0;   // 中古ドリッパーの残り耐久（購入時75スタート）
+
+        function getHarvestTime() {
+            return ownedItems.nutrient ? 57 : 60; // 栄養剤所持で収穫タイムが3秒短縮
+        }
+
+        function getRequiredFameCount(lvl) {
+            return lvl * 10;
+        }
+
+        function getVipChance(lvl) {
+            if (lvl < 2) return 0;
+            return 0.02 + (lvl * 0.005);
+        }
+
+        const costTables = {
+            farm:   [0, 1200, 4000, 12000, 16000, 24000], 
+            mill:   [0, 800,  2500,  6000,  9500, 15000],  
+            cafe:   [0, 400,  1200,  3000,  5000,  8000],  
+            drip:   [0, 200,   600,  1500,  2500,  4500]   
+        };
+
+        let millProgress = 0;
+        let lastAngle = null;
+        let isDragging = false;
+
+        // ドリップ抽出スロット（基本1台＋中古ドリッパー所持で最大2台）
+        let dripSlots = [{ status: 'idle', progress: 0 }];
+
+        // 🐱 猫イベント用の状態
+        let catEvent = {
+            available: true,      // まだ「猫を譲りたい客」が出現していない（一回きり）
+            obtained: false,      // 猫を引き取ったか
+            farmUnlocked: false,  // 農場でスワイプして猫を飼えるようになったか
+            feedCount: 0,         // 餌やり回数（必要数の計算に使用）
+            feverActive: false,
+            feverRemaining: 0
+        };
+
+        // 🎁 中盤〜終盤向けショップ拡張（何度でも購入できるアイテム＋スタッフ雇用）
+        let coinBoostLevel = 0;     // コインブーストの購入回数（購入毎に+5%）
+        let signLevel = 0;          // 看板アップグレードの購入回数（購入毎に来店率+3%）
+        let staffHired = false;     // アルバイトスタッフを雇用済みか
+        let staffTimer = 0;         // 次の給料支払いまでの秒数
+        let totalShopPurchases = 0; // ショップでの累計購入回数（エンドレスミッションの目標に使用）
+
+        const STAFF_COST = 10000;
+        const STAFF_SALARY = 200;
+        const STAFF_SALARY_INTERVAL = 30; // 秒
+
+        function getCoinBoostCost() { return Math.round(5000 * Math.pow(1.6, coinBoostLevel)); }
+        function getSignCost() { return Math.round(4000 * Math.pow(1.5, signLevel)); }
+        function getCoinMultiplier() { return 1 + coinBoostLevel * 0.05; }
+        function getSignBonusSpawnChance() { return signLevel * 0.03; }
+
+        // エンドレスミッションの目標値（n = currentTier - 3。ティア4でn=1）
+        function getEndlessTargets(n) {
+            return {
+                drip: 15 + (n - 1) * 10,
+                vip: n,
+                fame: 3 + n,
+                shopPurchases: n + 2
+            };
+        }
+
+        let customerState = 'none';
+        let currentCustomerType = 0; 
+        let isVipArrival = false; 
+
+        const customerPool = [
+            { avatar: "👨‍💼", bubble: "仕事の前に、シャキッとする深い一杯を頼むよ。" },
+            { avatar: "👩‍🎨", bubble: "こんにちは！おまかせで美味しいコーヒーをくださいな。" },
+            { avatar: "👵", bubble: "ここのコーヒーを飲むとホッとするねぇ。" },
+            { avatar: "👨‍🎓", bubble: "テスト勉強用に、一番濃いやつお願いします！" }
+        ];
+
+        const vipCustomer = { avatar: "👑", bubble: "素晴らしい噂を聞いてな。極上の一杯に1,000コイン出そう！" };
+        const catOfferCustomer = { avatar: "🐱", bubble: "実は引っ越すことになって…この子を飼ってくれる人を探しているんです。よかったら飼ってくれませんか？" };
+
+        let trees = [
+            { state: 0, timer: 60 }, { state: 0, timer: 60 }, { state: 0, timer: 60 },
+            { state: 0, timer: 60 }, { state: 0, timer: 60 }, { state: 0, timer: 60 }
+        ];
+
+        // --- 💾 データ保存 ---
+        function saveGame() {
+            if (isLockSave) return; 
+            const gameState = {
+                rawBeans: rawBeans,
+                groundCoffee: groundCoffee,
+                brewedCoffee: brewedCoffee,
+                playerCoins: playerCoins,
+                levels: levels,
+                fameLevel: fameLevel,        
+                fameCoffeeCount: fameCoffeeCount,
+                currentTier: currentTier,
+                missionProgress: missionProgress,
+                missionClaimed: missionClaimed,
+                shopUnlocked: shopUnlocked,
+                ownedItems: ownedItems,
+                usedMillUses: usedMillUses,
+                usedDripperUses: usedDripperUses,
+                dripSlots: dripSlots,
+                catEvent: catEvent,
+                coinBoostLevel: coinBoostLevel,
+                signLevel: signLevel,
+                staffHired: staffHired,
+                staffTimer: staffTimer,
+                totalShopPurchases: totalShopPurchases
+            };
+            localStorage.setItem('myCoffeeCafe_saveData', JSON.stringify(gameState));
+        }
+
+        // --- 📂 データ読み込み ---
+        function loadGame() {
+            const savedData = localStorage.getItem('myCoffeeCafe_saveData');
+            if (savedData) {
+                try {
+                    const gameState = JSON.parse(savedData);
+                    rawBeans = gameState.rawBeans ?? 5;
+                    groundCoffee = gameState.groundCoffee ?? 0;
+                    brewedCoffee = gameState.brewedCoffee ?? 0;
+                    playerCoins = gameState.playerCoins ?? 0;
+                    if (gameState.levels) levels = gameState.levels;
+                    
+                    fameLevel = gameState.fameLevel ?? 1;          
+                    fameCoffeeCount = gameState.fameCoffeeCount ?? 0; 
+                    
+                    currentTier = gameState.currentTier ?? 1;
+                    if (gameState.missionProgress) missionProgress = gameState.missionProgress;
+                    // 旧セーブデータ互換: ティア3用フィールドが無ければ補完
+                    missionProgress.t3Drip = missionProgress.t3Drip ?? 0;
+                    missionProgress.t3VipServed = missionProgress.t3VipServed ?? false;
+
+                    missionClaimed = gameState.missionClaimed ?? false;
+                    shopUnlocked = gameState.shopUnlocked ?? false;
+
+                    missionProgress.endlessDrip = missionProgress.endlessDrip ?? 0;
+                    missionProgress.endlessVipServed = missionProgress.endlessVipServed ?? 0;
+
+                    const savedOwned = gameState.ownedItems ?? {};
+                    ownedItems = {
+                        nutrient: savedOwned.nutrient ?? false,
+                        usedMill: savedOwned.usedMill ?? false,
+                        usedDripper: savedOwned.usedDripper ?? false
+                    };
+
+                    usedMillUses = gameState.usedMillUses ?? 0;
+                    usedDripperUses = gameState.usedDripperUses ?? 0;
+
+                    if (Array.isArray(gameState.dripSlots) && gameState.dripSlots.length > 0) {
+                        dripSlots = gameState.dripSlots;
+                    } else {
+                        dripSlots = [{ status: 'idle', progress: 0 }];
+                    }
+                    syncDripSlots();
+
+                    const savedCat = gameState.catEvent ?? {};
+                    catEvent = {
+                        available: savedCat.available ?? true,
+                        obtained: savedCat.obtained ?? false,
+                        farmUnlocked: savedCat.farmUnlocked ?? false,
+                        feedCount: savedCat.feedCount ?? 0,
+                        feverActive: savedCat.feverActive ?? false,
+                        feverRemaining: savedCat.feverRemaining ?? 0
+                    };
+
+                    coinBoostLevel = gameState.coinBoostLevel ?? 0;
+                    signLevel = gameState.signLevel ?? 0;
+                    staffHired = gameState.staffHired ?? false;
+                    staffTimer = gameState.staffTimer ?? 0;
+                    totalShopPurchases = gameState.totalShopPurchases ?? 0;
+                } catch (e) {
+                    console.error("セーブデータの読み込みに失敗しました", e);
+                }
+            }
+
+            document.getElementById('nav-shop').style.display = shopUnlocked ? "flex" : "none";
+        }
+
+        // --- 🧹 初期化関数 ---
+        function resetGame() {
+            if (confirm("【最終警告】ゲームデータを完全に初期化して最初からやり直しますか？\nこの操作は取り消せません。")) {
+                isLockSave = true; 
+                
+                let id = window.setTimeout(function() {}, 0);
+                while (id--) { window.clearTimeout(id); }
+                
+                localStorage.removeItem('myCoffeeCafe_saveData');
+                localStorage.clear();
+                
+                alert("セーブデータを完全に消去しました。新しいお店を起動します！");
+                
+                window.location.href = window.location.pathname + '?clear=' + Date.now();
+            }
+        }
+
+        // --- 画面切り替え ---
+        function switchPage(pageName) {
+            document.getElementById('page-kitchen').classList.toggle('active', pageName === 'kitchen');
+            document.getElementById('page-mill').classList.toggle('active', pageName === 'mill');
+            document.getElementById('page-cafe').classList.toggle('active', pageName === 'cafe');
+            document.getElementById('page-drip').classList.toggle('active', pageName === 'drip');
+            document.getElementById('page-farm').classList.toggle('active', pageName === 'farm');
+            document.getElementById('page-shop').classList.toggle('active', pageName === 'shop');
+            
+            document.getElementById('nav-kitchen').classList.toggle('active', pageName === 'kitchen');
+            document.getElementById('nav-mill').classList.toggle('active', pageName === 'mill');
+            document.getElementById('nav-cafe').classList.toggle('active', pageName === 'cafe');
+            document.getElementById('nav-drip').classList.toggle('active', pageName === 'drip');
+            document.getElementById('nav-farm').classList.toggle('active', pageName === 'farm');
+            document.getElementById('nav-shop').classList.toggle('active', pageName === 'shop');
+        }
+
+        // --- レベルアップ購入処理 ---
+        function buyLevel(type) {
+            let currentLvl = levels[type];
+            if (currentLvl >= 6) return; 
+            
+            let cost = costTables[type][currentLvl];
+            if (playerCoins >= cost) {
+                playerCoins -= cost;
+                levels[type] += 1;
+
+                updateUI();
+                saveGame(); 
+            }
+        }
+
+        // 🎁 ショップアイテム購入処理（買い切り・耐久あり）
+        function buyShopItem(key) {
+            if (ownedItems[key]) return; // 使用中（未破損）は購入不可
+            const cost = shopCosts[key];
+            if (playerCoins < cost) return;
+
+            playerCoins -= cost;
+            ownedItems[key] = true;
+            totalShopPurchases += 1;
+
+            if (key === 'usedMill') {
+                usedMillUses = 100;
+            } else if (key === 'usedDripper') {
+                usedDripperUses = 75;
+                syncDripSlots();
+            }
+
+            updateUI();
+            saveGame();
+        }
+
+        // ドリップスロット数を所持アイテムに合わせて同期（基本1台＋中古ドリッパーで2台）
+        function syncDripSlots() {
+            const totalSlots = ownedItems.usedDripper ? 2 : 1;
+            while (dripSlots.length < totalSlots) dripSlots.push({ status: 'idle', progress: 0 });
+            while (dripSlots.length > totalSlots) dripSlots.pop();
+        }
+
+        // 💰 コインブースト購入（何度でも購入可・購入毎に+5%＆値上がり）
+        function buyCoinBoost() {
+            const cost = getCoinBoostCost();
+            if (playerCoins < cost) return;
+            playerCoins -= cost;
+            coinBoostLevel += 1;
+            totalShopPurchases += 1;
+            updateUI();
+            saveGame();
+        }
+
+        // 📢 看板アップグレード購入（何度でも購入可・購入毎に来店率+3%＆値上がり）
+        function buySignUpgrade() {
+            const cost = getSignCost();
+            if (playerCoins < cost) return;
+            playerCoins -= cost;
+            signLevel += 1;
+            totalShopPurchases += 1;
+            updateUI();
+            saveGame();
+        }
+
+        // 🧑‍🍳 アルバイトスタッフ雇用（一回限り・以後は定期的に給料が発生）
+        function buyStaff() {
+            if (staffHired) return;
+            if (playerCoins < STAFF_COST) return;
+            playerCoins -= STAFF_COST;
+            staffHired = true;
+            staffTimer = STAFF_SALARY_INTERVAL;
+            totalShopPurchases += 1;
+            updateUI();
+            saveGame();
+        }
+
+        // 🏅 名店メーター上昇ロジック
+        function addFameProgress() {
+            fameCoffeeCount += 1;
+            let reqCount = getRequiredFameCount(fameLevel);
+            if (fameCoffeeCount >= reqCount) {
+                fameCoffeeCount = 0;
+                fameLevel += 1; 
+            }
+        }
+
+        // --- 📋 ミッション条件判定ロジック ---
+        function checkMissionClear() {
+            if (currentTier === 1) {
+                return (missionProgress.harvest >= 3 && missionProgress.grind >= 30 && missionProgress.drip >= 3 && missionProgress.serve >= 3);
+            } else if (currentTier === 2) {
+                return (missionProgress.t2Drip >= 5 && fameLevel >= 2 && levels.farm >= 2 && levels.mill >= 2);
+            } else if (currentTier === 3) {
+                return (missionProgress.t3Drip >= 15 && missionProgress.t3VipServed && fameLevel >= 3 && levels.cafe >= 2);
+            } else if (currentTier >= 4) {
+                const n = currentTier - 3;
+                const t = getEndlessTargets(n);
+                return (missionProgress.endlessDrip >= t.drip && missionProgress.endlessVipServed >= t.vip && fameLevel >= t.fame && totalShopPurchases >= t.shopPurchases);
+            }
+            return false;
+        }
+
+        // --- 📋 ミッション報酬受け取り ---
+        function claimMissionReward() {
+            if (currentTier === 1 && checkMissionClear()) {
+                rawBeans += 10;
+                currentTier = 2; // ティア2へ進む
+                missionClaimed = false; // 新しいティア用にリセット
+                alert("🎉 ティア1 クリア！報酬として生豆を10個獲得しました！\nティア2 ミッションが開放されました！");
+                updateUI();
+                saveGame();
+            } else if (currentTier === 2 && checkMissionClear()) {
+                rawBeans += 30;
+                currentTier = 3; // ティア3へ進む
+                missionClaimed = false; // 新しいティア用にリセット
+                alert("🎉🎉 ティア2 クリア！報酬として生豆を30個獲得しました！\nティア3 ミッションが開放されました！");
+                updateUI();
+                saveGame();
+            } else if (currentTier === 3 && checkMissionClear()) {
+                rawBeans += 50;
+                playerCoins += 2000;
+                currentTier = 4; // エンドレスミッションへ移行
+                missionClaimed = true;
+                shopUnlocked = true;
+                document.getElementById('nav-shop').style.display = "flex";
+                alert("🎉🎉🎉 ティア3 クリア！報酬として生豆を50個・2,000コインを獲得しました！\nショップが解放され、エンドレスミッションが始まります！");
+                updateUI();
+                saveGame();
+            } else if (currentTier >= 4 && checkMissionClear()) {
+                const n = currentTier - 3;
+                const coinReward = 1000 * n;
+                const beanReward = 20 * n;
+                playerCoins += coinReward;
+                rawBeans += beanReward;
+                missionProgress.endlessDrip = 0;
+                missionProgress.endlessVipServed = 0;
+                currentTier += 1;
+                alert(`🎉 エンドレスミッション ${n} クリア！報酬: 生豆+${beanReward}粒・${coinReward}コイン！\n次の目標が設定されました。`);
+                updateUI();
+                saveGame();
+            }
+        }
+
+        // --- UI更新メイン ---
+        function updateUI() {
+            document.getElementById('raw-beans').innerText = rawBeans;
+            document.getElementById('ground-coffee').innerText = groundCoffee + "g";
+            document.getElementById('brewed-coffee').innerText = brewedCoffee;
+            document.getElementById('player-coins').innerText = playerCoins;
+
+            const types = ['farm', 'mill', 'drip', 'cafe'];
+            types.forEach(type => {
+                const lvl = levels[type];
+                const lbl = document.getElementById(`lbl-lvl-${type}`);
+                const btn = document.getElementById(`btn-lvl-${type}`);
+                
+                if (lvl >= 6) {
+                    lbl.innerText = "Lv.MAX";
+                    lbl.className = "lvl-badge max";
+                    btn.innerText = "強化MAX";
+                    btn.disabled = true;
+                } else {
+                    lbl.innerText = `Lv.${lvl}`;
+                    lbl.className = "lvl-badge";
+                    let cost = costTables[type][lvl];
+                    btn.innerText = `強化: ${cost}C`;
+                    btn.disabled = (playerCoins < cost);
+                }
+            });
+
+            document.getElementById('desc-farm').innerText = `栽培マス増加 (現在: 6マス中 ${levels.farm}マス 開放)`;
+            document.getElementById('desc-mill').innerText = `手回し効率アップ (現在: 効率x${levels.mill})`;
+            document.getElementById('desc-drip').innerText = `抽出スピードアップ (現在: 1秒で+${20 + (levels.drip-1)*10}%)`;
+            document.getElementById('desc-cafe').innerText = `単価＆来店率アップ (現在: 1杯 ${100 + (levels.cafe-1)*20}C)`;
+
+            document.getElementById('mill-instruction').innerText = ownedItems.usedMill
+                ? `生豆をセットしてハンドルをぐるぐる回そう！（中古ミル使用中：耐久 ${usedMillUses}/100）`
+                : "生豆をセットしてハンドルをぐるぐる回そう！";
+            document.getElementById('mill-progress').style.width = millProgress + "%";
+            document.getElementById('progress-text').innerText = Math.floor(millProgress);
+
+            renderDripSlots();
+
+            const bubbleEl = document.getElementById('cust-bubble');
+            const avatarEl = document.getElementById('cust-avatar');
+            const badgeArea = document.getElementById('serve-badge-area');
+            const earningsPerCup = Math.round((100 + (levels.cafe - 1) * 20) * getCoinMultiplier());
+            document.getElementById('txt-earnings-per-cup').innerText = `+${earningsPerCup}C`;
+
+            if (customerState === 'none') {
+                bubbleEl.innerText = "次のお客様を待っています...";
+                avatarEl.innerText = "🛋️";
+                badgeArea.innerHTML = "";
+            } else if (customerState === 'catOffer') {
+                bubbleEl.innerText = catOfferCustomer.bubble;
+                avatarEl.innerText = catOfferCustomer.avatar;
+                badgeArea.innerHTML = `<div class="serve-badge" style="background:#a8dadc;">🐱 猫を引き取る (タップ)</div>`;
+            } else if (customerState === 'waiting') {
+                if (isVipArrival) {
+                    bubbleEl.innerText = vipCustomer.bubble;
+                    avatarEl.innerText = vipCustomer.avatar;
+                    if (brewedCoffee >= 1) {
+                        badgeArea.innerHTML = `<div class="serve-badge vip">👑 太客に給仕する (+1,000C)</div>`;
+                    } else {
+                        badgeArea.innerHTML = `<div style="font-size:11px; color:#e63946; margin-top:5px; font-weight:bold;">太客を待たせています！豆が足りません！</div>`;
+                    }
+                } else {
+                    const c = customerPool[currentCustomerType];
+                    bubbleEl.innerText = c.bubble;
+                    avatarEl.innerText = c.avatar;
+                    if (brewedCoffee >= 1) {
+                        badgeArea.innerHTML = `<div class="serve-badge">コーヒーを出す (タップ)</div>`;
+                    } else {
+                        badgeArea.innerHTML = `<div style="font-size:11px; color:#e63946; margin-top:5px;">コーヒーが不足しています</div>`;
+                    }
+                }
+            }
+
+            let reqCount = getRequiredFameCount(fameLevel);
+            let chance = getVipChance(fameLevel);
+            
+            document.getElementById('lbl-fame-level').innerText = `Lv.${fameLevel}`;
+            document.getElementById('lbl-fame-vip-chance').innerText = `太客確率: ${(chance * 100).toFixed(1)}%`;
+            document.getElementById('lbl-fame-count').innerText = `次のレベルまで: ${fameCoffeeCount} / ${reqCount} 杯`;
+            
+            const famePercent = (fameCoffeeCount / reqCount) * 100;
+            document.getElementById('fame-progress').style.width = famePercent + "%";
+
+            trees.forEach((tree, index) => {
+                const treeEl = document.getElementById(`tree-${index}`);
+                const iconEl = document.getElementById(`icon-${index}`);
+                const statusEl = document.getElementById(`status-${index}`);
+                
+                if (index >= levels.farm) {
+                    treeEl.className = "tree-card locked";
+                    iconEl.innerText = "🔒";
+                    statusEl.innerText = `農場Lv.${index + 1}で開放`;
+                } else {
+                    treeEl.className = "tree-card";
+                    if (tree.state === 0) { iconEl.innerText = "🌱"; statusEl.innerText = `新芽 (${tree.timer}s)`; treeEl.classList.remove('ready'); }
+                    else if (tree.state === 1) { iconEl.innerText = "🌿"; statusEl.innerText = `開花中 (${tree.timer}s)`; treeEl.classList.remove('ready'); }
+                    else if (tree.state === 2) { iconEl.innerText = "🍒"; statusEl.innerText = "完熟！収穫可能"; treeEl.classList.add('ready'); }
+                }
+            });
+
+            // --- 📋 ミッションUI更新の分岐 ---
+            const titleEl = document.getElementById('m-board-title');
+            const rewardEl = document.getElementById('m-board-reward');
+            const claimBtn = document.getElementById('btn-claim-mission');
+
+            if (currentTier === 1) {
+                titleEl.innerText = "📋 ティア1 ミッション";
+                rewardEl.innerText = "報酬: 生豆+10粒";
+
+                document.getElementById('m-text-1').innerText = "1-1 コーヒー豆を3個収穫する";
+                document.getElementById('m-count-1').innerText = `${Math.min(3, missionProgress.harvest)} / 3`;
+                document.getElementById('m-item-1').classList.toggle('done', missionProgress.harvest >= 3);
+
+                document.getElementById('m-text-2').innerText = "1-2 ミル挽きをし30gの粉を生成する";
+                document.getElementById('m-count-2').innerText = `${Math.min(30, missionProgress.grind)} / 30g`;
+                document.getElementById('m-item-2').classList.toggle('done', missionProgress.grind >= 30);
+
+                document.getElementById('m-text-3').innerText = "1-3 ドリップをし3杯コーヒーを生成する";
+                document.getElementById('m-count-3').innerText = `${Math.min(3, missionProgress.drip)} / 3杯`;
+                document.getElementById('m-item-3').classList.toggle('done', missionProgress.drip >= 3);
+
+                document.getElementById('m-text-4').innerText = "1-4 3杯のコーヒーをお客様に提供する";
+                document.getElementById('m-count-4').innerText = `${Math.min(3, missionProgress.serve)} / 3杯`;
+                document.getElementById('m-item-4').classList.toggle('done', missionProgress.serve >= 3);
+
+                claimBtn.innerText = checkMissionClear() ? "報酬を受け取る！" : "未達成";
+                claimBtn.disabled = !checkMissionClear();
+            } else if (currentTier === 2) {
+                titleEl.innerText = "📋 ティア2 ミッション";
+                rewardEl.innerText = "報酬: 生豆+30粒";
+
+                document.getElementById('m-text-1').innerText = "2-1 コーヒーを5杯生成する";
+                document.getElementById('m-count-1').innerText = `${Math.min(5, missionProgress.t2Drip)} / 5杯`;
+                document.getElementById('m-item-1').classList.toggle('done', missionProgress.t2Drip >= 5);
+
+                document.getElementById('m-text-2').innerText = "2-2 名店メーターを2にする";
+                document.getElementById('m-count-2').innerText = `現在: Lv.${fameLevel} / 目標: Lv.2`;
+                document.getElementById('m-item-2').classList.toggle('done', fameLevel >= 2);
+
+                document.getElementById('m-text-3').innerText = "2-3 コーヒー農場をレベル2にする";
+                document.getElementById('m-count-3').innerText = `現在: Lv.${levels.farm} / 目標: Lv.2`;
+                document.getElementById('m-item-3').classList.toggle('done', levels.farm >= 2);
+
+                document.getElementById('m-text-4').innerText = "2-4 ミル挽きをレベル2にする";
+                document.getElementById('m-count-4').innerText = `現在: Lv.${levels.mill} / 目標: Lv.2`;
+                document.getElementById('m-item-4').classList.toggle('done', levels.mill >= 2);
+
+                claimBtn.innerText = checkMissionClear() ? "報酬を受け取る！" : "未達成";
+                claimBtn.disabled = !checkMissionClear();
+            } else if (currentTier === 3) {
+                titleEl.innerText = "📋 ティア3 ミッション";
+                rewardEl.innerText = "報酬: 生豆+50粒・2,000C";
+
+                document.getElementById('m-text-1').innerText = "3-1 コーヒーを15杯生成する";
+                document.getElementById('m-count-1').innerText = `${Math.min(15, missionProgress.t3Drip)} / 15杯`;
+                document.getElementById('m-item-1').classList.toggle('done', missionProgress.t3Drip >= 15);
+
+                document.getElementById('m-text-2').innerText = "3-2 太客にコーヒーを売る";
+                document.getElementById('m-count-2').innerText = missionProgress.t3VipServed ? "達成" : "未達成";
+                document.getElementById('m-item-2').classList.toggle('done', missionProgress.t3VipServed);
+
+                document.getElementById('m-text-3').innerText = "3-3 名店メーターをレベル3にする";
+                document.getElementById('m-count-3').innerText = `現在: Lv.${fameLevel} / 目標: Lv.3`;
+                document.getElementById('m-item-3').classList.toggle('done', fameLevel >= 3);
+
+                document.getElementById('m-text-4').innerText = "3-4 カフェ接客をレベル2にする";
+                document.getElementById('m-count-4').innerText = `現在: Lv.${levels.cafe} / 目標: Lv.2`;
+                document.getElementById('m-item-4').classList.toggle('done', levels.cafe >= 2);
+
+                claimBtn.innerText = checkMissionClear() ? "報酬を受け取る！" : "未達成";
+                claimBtn.disabled = !checkMissionClear();
+            } else {
+                // 🔁 エンドレスミッション（ティア4以降、無限に続く）
+                const n = currentTier - 3;
+                const t = getEndlessTargets(n);
+
+                titleEl.innerText = `📋 エンドレスミッション ${n}`;
+                rewardEl.innerText = `報酬: 生豆+${20 * n}粒・${1000 * n}C`;
+
+                document.getElementById('m-text-1').innerText = `${n}-1 コーヒーを${t.drip}杯淹れる`;
+                document.getElementById('m-count-1').innerText = `${Math.min(t.drip, missionProgress.endlessDrip)} / ${t.drip}杯`;
+                document.getElementById('m-item-1').classList.toggle('done', missionProgress.endlessDrip >= t.drip);
+
+                document.getElementById('m-text-2').innerText = `${n}-2 太客に${t.vip}回コーヒーを売る`;
+                document.getElementById('m-count-2').innerText = `${Math.min(t.vip, missionProgress.endlessVipServed)} / ${t.vip}回`;
+                document.getElementById('m-item-2').classList.toggle('done', missionProgress.endlessVipServed >= t.vip);
+
+                document.getElementById('m-text-3').innerText = `${n}-3 名店メーターをLv.${t.fame}にする`;
+                document.getElementById('m-count-3').innerText = `現在: Lv.${fameLevel} / 目標: Lv.${t.fame}`;
+                document.getElementById('m-item-3').classList.toggle('done', fameLevel >= t.fame);
+
+                document.getElementById('m-text-4').innerText = `${n}-4 ショップで合計${t.shopPurchases}回購入する`;
+                document.getElementById('m-count-4').innerText = `現在: ${totalShopPurchases} / ${t.shopPurchases}回`;
+                document.getElementById('m-item-4').classList.toggle('done', totalShopPurchases >= t.shopPurchases);
+
+                claimBtn.innerText = checkMissionClear() ? "報酬を受け取る！" : "未達成";
+                claimBtn.disabled = !checkMissionClear();
+            }
+
+            // 🔴 キッチンタブ：ミッションが受け取り可能なら点滅
+            document.getElementById('dot-kitchen').classList.toggle('show', checkMissionClear());
+
+            // 🔴 農場タブ：収穫可能な木が1本でもあれば点滅
+            const farmReady = trees.some((tree, index) => index < levels.farm && tree.state === 2);
+            document.getElementById('dot-farm').classList.toggle('show', farmReady);
+
+            document.getElementById('nav-shop').style.display = shopUnlocked ? "flex" : "none";
+
+            // 🎁 ショップアイテムの購入状態を反映
+            const lblNutrient = document.getElementById('lbl-shop-nutrient');
+            const btnNutrient = document.getElementById('btn-shop-nutrient');
+            if (ownedItems.nutrient) {
+                lblNutrient.innerText = "所持中";
+                lblNutrient.className = "lvl-badge max";
+                btnNutrient.innerText = "購入済み";
+                btnNutrient.disabled = true;
+            } else {
+                lblNutrient.innerText = "未所持";
+                lblNutrient.className = "lvl-badge";
+                btnNutrient.innerText = `購入: ${shopCosts.nutrient}C`;
+                btnNutrient.disabled = (playerCoins < shopCosts.nutrient);
+            }
+
+            const lblMill = document.getElementById('lbl-shop-usedMill');
+            const btnMill = document.getElementById('btn-shop-usedMill');
+            if (ownedItems.usedMill) {
+                lblMill.innerText = `耐久 ${usedMillUses}/100`;
+                lblMill.className = "lvl-badge max";
+                btnMill.innerText = "使用中";
+                btnMill.disabled = true;
+            } else {
+                lblMill.innerText = "未所持";
+                lblMill.className = "lvl-badge";
+                btnMill.innerText = `購入: ${shopCosts.usedMill}C`;
+                btnMill.disabled = (playerCoins < shopCosts.usedMill);
+            }
+
+            const lblDripper = document.getElementById('lbl-shop-usedDripper');
+            const btnDripper = document.getElementById('btn-shop-usedDripper');
+            if (ownedItems.usedDripper) {
+                lblDripper.innerText = `耐久 ${usedDripperUses}/75`;
+                lblDripper.className = "lvl-badge max";
+                btnDripper.innerText = "使用中";
+                btnDripper.disabled = true;
+            } else {
+                lblDripper.innerText = "未所持";
+                lblDripper.className = "lvl-badge";
+                btnDripper.innerText = `購入: ${shopCosts.usedDripper}C`;
+                btnDripper.disabled = (playerCoins < shopCosts.usedDripper);
+            }
+
+            // 💰 コインブースト（何度でも購入可）
+            const lblCoinBoost = document.getElementById('lbl-shop-coinBoost');
+            const btnCoinBoost = document.getElementById('btn-shop-coinBoost');
+            if (lblCoinBoost && btnCoinBoost) {
+                const cbCost = getCoinBoostCost();
+                lblCoinBoost.innerText = `Lv.${coinBoostLevel} (+${coinBoostLevel * 5}%)`;
+                lblCoinBoost.className = coinBoostLevel > 0 ? "lvl-badge max" : "lvl-badge";
+                btnCoinBoost.innerText = `購入: ${cbCost}C`;
+                btnCoinBoost.disabled = (playerCoins < cbCost);
+            }
+
+            // 📢 看板アップグレード（何度でも購入可）
+            const lblSign = document.getElementById('lbl-shop-sign');
+            const btnSign = document.getElementById('btn-shop-sign');
+            if (lblSign && btnSign) {
+                const signCost = getSignCost();
+                lblSign.innerText = `Lv.${signLevel} (+${signLevel * 3}%)`;
+                lblSign.className = signLevel > 0 ? "lvl-badge max" : "lvl-badge";
+                btnSign.innerText = `購入: ${signCost}C`;
+                btnSign.disabled = (playerCoins < signCost);
+            }
+
+            // 🧑‍🍳 アルバイトスタッフ（一回限り雇用）
+            const lblStaff = document.getElementById('lbl-shop-staff');
+            const btnStaff = document.getElementById('btn-shop-staff');
+            if (lblStaff && btnStaff) {
+                if (staffHired) {
+                    lblStaff.innerText = `雇用中（給料まで${staffTimer}秒）`;
+                    lblStaff.className = "lvl-badge max";
+                    btnStaff.innerText = "雇用済み";
+                    btnStaff.disabled = true;
+                } else {
+                    lblStaff.innerText = "未雇用";
+                    lblStaff.className = "lvl-badge";
+                    btnStaff.innerText = `雇用: ${STAFF_COST}C`;
+                    btnStaff.disabled = (playerCoins < STAFF_COST);
+                }
+            }
+
+            // 🐱 猫イベントUIの更新
+            const swipeHintEl = document.getElementById('cat-swipe-hint');
+            const catCardEl = document.getElementById('cat-card');
+            if (swipeHintEl) {
+                swipeHintEl.style.display = (catEvent.obtained && !catEvent.farmUnlocked) ? "block" : "none";
+            }
+            if (catCardEl) {
+                catCardEl.style.display = catEvent.farmUnlocked ? "flex" : "none";
+                if (catEvent.farmUnlocked) {
+                    const req = getCatFeedRequirement();
+                    const feedDescEl = document.getElementById('cat-feed-desc');
+                    const feedBtnEl = document.getElementById('btn-feed-cat');
+                    const feverBannerEl = document.getElementById('fever-banner');
+
+                    if (catEvent.feverActive) {
+                        feedDescEl.innerText = "🔥 フィーバータイム中！";
+                        feedBtnEl.innerText = "フィーバー中...";
+                        feedBtnEl.disabled = true;
+                        feverBannerEl.style.display = "block";
+                        document.getElementById('fever-timer').innerText = catEvent.feverRemaining;
+                    } else {
+                        feedDescEl.innerText = `必要な生豆: ${req}粒`;
+                        feedBtnEl.innerText = `豆をあげる (${req}粒)`;
+                        feedBtnEl.disabled = (rawBeans < req);
+                        feverBannerEl.style.display = "none";
+                    }
+                }
+            }
+        }
+
+        function harvestTree(index) {
+            if (index >= levels.farm) return;
+
+            // 🔥 フィーバータイム中は成長状態を無視して豆を取り放題
+            if (catEvent.feverActive) {
+                rawBeans += 3;
+                if (currentTier === 1) missionProgress.harvest += 3;
+                updateUI();
+                saveGame();
+                return;
+            }
+
+            if (trees[index].state === 2) {
+                rawBeans += 3; 
+                
+                // ティア1用進捗カウント
+                if (currentTier === 1) missionProgress.harvest += 3;
+
+                trees[index].state = 0;
+                trees[index].timer = getHarvestTime(); 
+                updateUI();
+                saveGame(); 
+            }
+        }
+
+        // ドリップスロットのHTMLを描画（基本1台＋中古ドリッパー所持で2台）
+        function renderDripSlots() {
+            const container = document.getElementById('drip-slots-container');
+            if (!container) return;
+
+            let html = '';
+            dripSlots.forEach((slot, i) => {
+                const label = i === 0 ? '☕ 基本ドリッパー' : `☕ 中古ドリッパー（耐久 ${usedDripperUses}/75）`;
+                let emojiHtml, statusText, btnHtml;
+
+                if (slot.status === 'idle') {
+                    emojiHtml = "⏳";
+                    statusText = "粉がセットされています。お湯を注いでください。";
+                    const disabled = (groundCoffee < 10) ? 'disabled' : '';
+                    btnHtml = `<button onclick="startDrip(${i})" ${disabled}>お湯を注ぐ (粉10g消費)</button>`;
+                } else if (slot.status === 'dripping') {
+                    emojiHtml = "💧<br>⏳";
+                    statusText = `じっくり抽出中... (${Math.floor(slot.progress)}%)`;
+                    btnHtml = `<button disabled>抽出中...</button>`;
+                } else {
+                    emojiHtml = `<div class="coffee-cup-btn" onclick="collectCoffee(${i})">☕<div class="ready-text">タップして受け取る！</div></div>`;
+                    statusText = "極上の一杯が完成しました！";
+                    btnHtml = '';
+                }
+
+                html += `
+                    <div class="drip-slot-card">
+                        <div class="drip-slot-title">${label}</div>
+                        <div class="drip-visual">${emojiHtml}</div>
+                        ${btnHtml}
+                        <div class="progress-bar-container">
+                            <div class="progress-bar drip-bar" style="width:${slot.progress}%;"></div>
+                        </div>
+                        <div style="font-size: 12px; margin-top: 8px; color: #a68a75;">${statusText}</div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function startDrip(i) {
+            const slot = dripSlots[i];
+            if (!slot) return;
+            if (groundCoffee >= 10 && slot.status === 'idle') {
+                groundCoffee -= 10;
+                slot.status = 'dripping';
+                slot.progress = 0;
+                updateUI();
+            }
+        }
+
+        function collectCoffee(i) {
+            const slot = dripSlots[i];
+            if (!slot || slot.status !== 'ready') return;
+
+            brewedCoffee += 1;
+
+            // ミッションカウント追加
+            if (currentTier === 1) missionProgress.drip += 1;
+            if (currentTier === 2) missionProgress.t2Drip += 1;
+            if (currentTier === 3) missionProgress.t3Drip += 1;
+            if (currentTier >= 4) missionProgress.endlessDrip += 1;
+
+            slot.status = 'idle';
+            slot.progress = 0;
+
+            // i >= 1 は中古ドリッパーのスロット：使用のたびに耐久が減る
+            if (i >= 1 && ownedItems.usedDripper) {
+                usedDripperUses -= 1;
+                if (usedDripperUses <= 0) {
+                    ownedItems.usedDripper = false;
+                    usedDripperUses = 0;
+                    syncDripSlots();
+                    alert("☕ 中古のドリッパーが壊れてしまいました！買い替えが必要です。");
+                }
+            }
+
+            updateUI();
+            saveGame(); 
+        }
+
+        function serveCustomer() {
+            if (customerState === 'catOffer') {
+                catEvent.obtained = true;
+                customerState = 'none';
+                updateUI();
+                saveGame();
+                alert("🐱 猫を引き取りました！農場画面を横にスワイプしてみましょう。");
+                return;
+            }
+
+            if (customerState === 'waiting' && brewedCoffee >= 1) {
+                brewedCoffee -= 1;
+                
+                // ティア1用進捗カウント
+                if (currentTier === 1) missionProgress.serve += 1;
+
+                if (isVipArrival) {
+                    playerCoins += Math.round(1000 * getCoinMultiplier());
+                    // ティア3用進捗カウント（太客に販売）
+                    if (currentTier === 3) missionProgress.t3VipServed = true;
+                    if (currentTier >= 4) missionProgress.endlessVipServed += 1;
+                    isVipArrival = false;
+                } else {
+                    playerCoins += Math.round((100 + (levels.cafe - 1) * 20) * getCoinMultiplier());
+                }
+
+                addFameProgress(); 
+                customerState = 'none'; 
+                updateUI();
+                saveGame(); 
+            }
+        }
+
+        // ==================== ✨ 粉が散るパーティクル演出 ====================
+        function spawnGrindParticles(count) {
+            const container = document.getElementById('mill-particles');
+            if (!container) return;
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('div');
+                p.className = 'grind-particle';
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 30 + Math.random() * 55;
+                const tx = Math.cos(angle) * dist;
+                const ty = Math.sin(angle) * dist + 25; // 少し重力っぽく下に散らす
+                p.style.setProperty('--tx', tx + 'px');
+                p.style.setProperty('--ty', ty + 'px');
+                p.style.background = Math.random() > 0.5 ? '#a9825a' : '#6f4e37';
+                const size = 4 + Math.random() * 4;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                container.appendChild(p);
+                setTimeout(() => p.remove(), 650);
+            }
+        }
+
+        // ==================== ⚙️ ミル手回しギミック ====================
+        const wheel = document.getElementById('mill-wheel');
+        const handle = document.getElementById('mill-handle');
+
+        function getAngle(clientX, clientY) {
+            const rect = wheel.getBoundingClientRect();
+            return Math.atan2(clientY - (rect.top + rect.height / 2), clientX - (rect.left + rect.width / 2));
+        }
+
+        function startDrag(e) {
+            if (rawBeans < 1) return; 
+            isDragging = true;
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            lastAngle = getAngle(clientX, clientY);
+        }
+
+        function doDrag(e) {
+            if (!isDragging || rawBeans < 1) return;
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            const currentAngle = getAngle(clientX, clientY);
+
+            let angleDiff = currentAngle - lastAngle;
+            if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+            if (Math.abs(angleDiff) > 0.02) {
+                let millMultiplier = (8 + (levels.mill - 1) * 2) * (ownedItems.usedMill ? 2 : 1);
+                millProgress += Math.abs(angleDiff) * millMultiplier; 
+                handle.style.transform = `rotate(${currentAngle}rad)`;
+                const radius = 60; 
+                const hX = Math.cos(currentAngle) * radius + 60; 
+                const hY = Math.sin(currentAngle) * radius + 60;
+                handle.style.left = hX + 'px';
+                handle.style.top = hY + 'px';
+
+                // ハンドルを回すたびに軽く粉が散る演出
+                spawnGrindParticles(2);
+
+                if (millProgress >= 100) {
+                    millProgress = 0;
+                    rawBeans -= 1;
+                    groundCoffee += 10;
+
+                    // 挽き終わりに粉が大きく散る演出
+                    spawnGrindParticles(18);
+
+                    // ティア1用進捗カウント
+                    if (currentTier === 1) missionProgress.grind += 10;
+
+                    // 🔧 中古ミルの耐久を消費（壊れたら効果消滅）
+                    if (ownedItems.usedMill) {
+                        usedMillUses -= 1;
+                        if (usedMillUses <= 0) {
+                            ownedItems.usedMill = false;
+                            usedMillUses = 0;
+                            alert("🔧 中古のミルが壊れてしまいました！買い替えが必要です。");
+                        }
+                    }
+
+                    saveGame(); 
+                }
+                updateUI();
+            }
+            lastAngle = currentAngle;
+        }
+
+        function endDrag() { isDragging = false; lastAngle = null; }
+
+        wheel.addEventListener('mousedown', startDrag);
+        window.addEventListener('mousemove', doDrag);
+        window.addEventListener('mouseup', endDrag);
+        wheel.addEventListener('touchstart', startDrag, { passive: true });
+        window.addEventListener('touchmove', doDrag, { passive: true });
+        window.addEventListener('touchend', endDrag);
+
+
+        // ==================== ⏱ メインループ（1秒ごと） ====================
+        setInterval(function() {
+            trees.forEach((tree, index) => {
+                if (index < levels.farm && tree.state < 2) {
+                    tree.timer -= 1;
+                    if (tree.timer === 30 && tree.state === 0) tree.state = 1;
+                    if (tree.timer <= 0) { tree.state = 2; tree.timer = 0; }
+                }
+            });
+
+            // 💧 各ドリップスロットの抽出進行
+            dripSlots.forEach((slot, i) => {
+                if (slot.status === 'dripping') {
+                    let dripIncrement = 20 + (levels.drip - 1) * 10;
+                    // 中古ドリッパーのスロットは最低でも2秒(50%/秒)で完了
+                    if (i >= 1 && ownedItems.usedDripper) dripIncrement = Math.max(dripIncrement, 50);
+                    slot.progress += dripIncrement;
+                    if (slot.progress >= 100) {
+                        slot.progress = 100;
+                        slot.status = 'ready';
+                    }
+                }
+            });
+
+            // 🔥 フィーバータイムのカウントダウン
+            if (catEvent.feverActive) {
+                catEvent.feverRemaining -= 1;
+                if (catEvent.feverRemaining <= 0) {
+                    catEvent.feverActive = false;
+                    catEvent.feverRemaining = 0;
+                    saveGame();
+                }
+            }
+
+            if (customerState === 'none') {
+                // 🐱 猫を譲りたい客（一回きり）の出現判定
+                if (catEvent.available && !catEvent.obtained && Math.random() < 0.04) {
+                    customerState = 'catOffer';
+                    catEvent.available = false; // 二度と出現しない
+                    saveGame();
+                } else {
+                    let spawnChance = 0.2 + (levels.cafe * 0.05) + getSignBonusSpawnChance();
+                    spawnChance = Math.min(spawnChance, 0.95); // 上限キャップ
+                    if (Math.random() < spawnChance) {
+                        customerState = 'waiting';
+                        
+                        let vipChance = getVipChance(fameLevel);
+                        if (vipChance > 0 && Math.random() < vipChance) {
+                            isVipArrival = true;
+                        } else {
+                            isVipArrival = false;
+                            currentCustomerType = Math.floor(Math.random() * customerPool.length);
+                        }
+                    }
+                }
+            }
+
+            // 🧑‍🍳 アルバイトスタッフの自動作業（収穫・ドリップ受け取り・接客／猫の勧誘は対象外）
+            if (staffHired) {
+                trees.forEach((tree, index) => {
+                    if (index < levels.farm && (tree.state === 2 || catEvent.feverActive)) {
+                        harvestTree(index);
+                    }
+                });
+
+                dripSlots.forEach((slot, i) => {
+                    if (slot.status === 'ready') collectCoffee(i);
+                });
+
+                if (customerState === 'waiting' && brewedCoffee >= 1) {
+                    serveCustomer();
+                }
+
+                staffTimer -= 1;
+                if (staffTimer <= 0) {
+                    if (playerCoins >= STAFF_SALARY) {
+                        playerCoins -= STAFF_SALARY;
+                    }
+                    staffTimer = STAFF_SALARY_INTERVAL;
+                    saveGame();
+                }
+            }
+
+            updateUI();
+        }, 1000);
+
+        // ==================== 🐱 猫イベント：餌やり＆フィーバータイム ====================
+        function getCatFeedRequirement() {
+            return 100 + catEvent.feedCount * 50; // 回数をこなすたびに必要数が増えていく
+        }
+
+        function feedCat() {
+            if (!catEvent.farmUnlocked || catEvent.feverActive) return;
+            const req = getCatFeedRequirement();
+            if (rawBeans < req) {
+                alert(`生豆が足りません！（必要: ${req}粒）`);
+                return;
+            }
+            rawBeans -= req;
+            catEvent.feedCount += 1;
+            catEvent.feverActive = true;
+            catEvent.feverRemaining = 15; // 15秒間のフィーバータイム
+            updateUI();
+            saveGame();
+        }
+
+        // ==================== 🐱 農場画面のスワイプ検出（猫を飼えるようにする） ====================
+        const farmPage = document.getElementById('page-farm');
+        let farmSwipeStartX = null;
+        let farmSwipeStartY = null;
+
+        function handleFarmSwipeStart(x, y) {
+            if (!catEvent.obtained || catEvent.farmUnlocked) return;
+            farmSwipeStartX = x;
+            farmSwipeStartY = y;
+        }
+
+        function handleFarmSwipeEnd(x, y) {
+            if (!catEvent.obtained || catEvent.farmUnlocked || farmSwipeStartX === null) return;
+            const dx = x - farmSwipeStartX;
+            const dy = y - farmSwipeStartY;
+            if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                catEvent.farmUnlocked = true;
+                updateUI();
+                saveGame();
+                alert("🐱 ニャー！ 猫が農場に住み着きました！コーヒー豆をあげてみましょう。");
+            }
+            farmSwipeStartX = null;
+            farmSwipeStartY = null;
+        }
+
+        farmPage.addEventListener('touchstart', function(e) {
+            handleFarmSwipeStart(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: true });
+        farmPage.addEventListener('touchend', function(e) {
+            handleFarmSwipeEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+        });
+
+        farmPage.addEventListener('mousedown', function(e) {
+            handleFarmSwipeStart(e.clientX, e.clientY);
+        });
+        farmPage.addEventListener('mouseup', function(e) {
+            handleFarmSwipeEnd(e.clientX, e.clientY);
+        });
+
+        loadGame();
+        updateUI();
+    </script>
+</body>
+</html>
